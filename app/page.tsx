@@ -57,10 +57,6 @@ function comboKey(segment: Segment, market: Market): Key {
   return `${segment}-${market}`;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export default function Home() {
   const [segment, setSegment] = useState<Segment>("Investor");
   const [market, setMarket] = useState<Market>("GB");
@@ -114,33 +110,6 @@ export default function Home() {
     };
   }
 
-  async function generateOneWithRetry(
-    s: Segment,
-    m: Market,
-    attempts = 3
-  ): Promise<EmailPayload> {
-    let lastError: unknown;
-    for (let i = 1; i <= attempts; i += 1) {
-      try {
-        return await generateOne(s, m);
-      } catch (e) {
-        lastError = e;
-        const message = e instanceof Error ? e.message : String(e);
-        const isRetryable =
-          message.includes("429") ||
-          message.includes("rate limit") ||
-          message.includes("temporarily") ||
-          message.includes("failed_generation") ||
-          message.includes("Failed to generate JSON");
-        if (!isRetryable || i === attempts) break;
-        await sleep(350 * i);
-      }
-    }
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Generation failed — try again.");
-  }
-
   async function handleGenerateEmail() {
     setLoading(true);
     setError(null);
@@ -162,30 +131,68 @@ export default function Home() {
     setError(null);
     setBatchResults({});
     setSelectedBatch(null);
-    const jobs = SEGMENTS.flatMap((s) => MARKETS.map((m) => ({ s, m })));
-    const concurrency = 4;
-    let cursor = 0;
-
-    async function worker() {
-      while (cursor < jobs.length) {
-        const idx = cursor;
-        cursor += 1;
-        const { s, m } = jobs[idx];
-        const k = comboKey(s, m);
-        try {
-          const email = await generateOneWithRetry(s, m, 3);
-          setBatchResults((prev) => ({ ...prev, [k]: { email } }));
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : "Generation failed — try again.";
-          setBatchResults((prev) => ({ ...prev, [k]: { error: msg } }));
-        } finally {
-          setBatchDone((x) => x + 1);
+    try {
+      const combos = SEGMENTS.flatMap((s) =>
+        MARKETS.map((m) => ({ segment: s, market: m }))
+      );
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "batch", combinations: combos }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Generation failed — try again."
+        );
+      }
+      if (!Array.isArray(data.campaigns)) {
+        throw new Error("Invalid batch payload from model");
+      }
+      const next: Partial<Record<Key, { email?: EmailPayload; error?: string }>> =
+        {};
+      for (const item of data.campaigns) {
+        if (item === null || typeof item !== "object") continue;
+        const c = item as Record<string, unknown>;
+        if (
+          typeof c.segment !== "string" ||
+          typeof c.market !== "string" ||
+          typeof c.subject_a !== "string" ||
+          typeof c.subject_a_angle !== "string" ||
+          typeof c.subject_b !== "string" ||
+          typeof c.subject_b_angle !== "string" ||
+          typeof c.body !== "string"
+        ) {
+          continue;
+        }
+        const k = comboKey(c.segment as Segment, c.market as Market);
+        next[k] = {
+          email: {
+            subject_a: c.subject_a,
+            subject_a_angle: c.subject_a_angle,
+            subject_b: c.subject_b,
+            subject_b_angle: c.subject_b_angle,
+            body: c.body,
+          },
+        };
+      }
+      for (const s of SEGMENTS) {
+        for (const m of MARKETS) {
+          const k = comboKey(s, m);
+          if (!next[k]) next[k] = { error: "Missing campaign item from batch" };
         }
       }
+      setBatchResults(next);
+      setBatchDone(16);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Generation failed — try again.";
+      setError(msg);
+      setBatchDone(16);
+    } finally {
+      setBatchLoading(false);
     }
-
-    await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    setBatchLoading(false);
   }
 
   async function copyEmail(email: EmailPayload, version: SubjectVersion) {

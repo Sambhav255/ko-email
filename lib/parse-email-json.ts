@@ -34,6 +34,18 @@ export type CampaignEmailPayload = {
   body: string;
 };
 
+export type BatchCampaignPayload = {
+  campaigns: Array<{
+    segment: string;
+    market: string;
+    subject_a: string;
+    subject_a_angle: string;
+    subject_b: string;
+    subject_b_angle: string;
+    body: string;
+  }>;
+};
+
 export function isCampaignEmailPayload(
   value: unknown
 ): value is CampaignEmailPayload {
@@ -49,4 +61,28 @@ export function isCampaignEmailPayload(
     o.subject_b.trim().length > 0 &&
     o.body.trim().length > 0
   );
+}
+
+export function isBatchCampaignPayload(
+  value: unknown
+): value is BatchCampaignPayload {
+  if (value === null || typeof value !== "object") return false;
+  const o = value as Record<string, unknown>;
+  if (!Array.isArray(o.campaigns) || o.campaigns.length === 0) return false;
+  return o.campaigns.every((item) => {
+    if (item === null || typeof item !== "object") return false;
+    const c = item as Record<string, unknown>;
+    return (
+      typeof c.segment === "string" &&
+      typeof c.market === "string" &&
+      typeof c.subject_a === "string" &&
+      typeof c.subject_a_angle === "string" &&
+      typeof c.subject_b === "string" &&
+      typeof c.subject_b_angle === "string" &&
+      typeof c.body === "string" &&
+      c.subject_a.trim().length > 0 &&
+      c.subject_b.trim().length > 0 &&
+      c.body.trim().length > 0
+    );
+  });
 }
