@@ -28,6 +28,26 @@ type GroqPayload = {
 
 type Combo = { segment: string; market: string };
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    // code fences / inline code
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]*)`/g, "$1")
+    // links and images
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    // emphasis + highlight-ish markers
+    .replace(/(\*\*|__|\*|_|~~|==)/g, "")
+    // headings / blockquotes / list markers
+    .replace(/^\s{0,3}(#{1,6})\s+/gm, "")
+    .replace(/^\s{0,3}>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function comboId(c: Combo): string {
   return `${c.segment}||${c.market}`;
 }
@@ -57,11 +77,11 @@ function normalizeCampaign(
   return {
     segment: c.segment,
     market: c.market,
-    subject_a: c.subject_a,
+    subject_a: stripMarkdown(c.subject_a),
     subject_a_angle: c.subject_a_angle,
-    subject_b: c.subject_b,
+    subject_b: stripMarkdown(c.subject_b),
     subject_b_angle: c.subject_b_angle,
-    body: c.body,
+    body: stripMarkdown(c.body),
   };
 }
 
@@ -329,11 +349,11 @@ IMPORTANT: Return only valid JSON.`,
     }
 
     return NextResponse.json({
-      subject_a: parsed.subject_a,
+      subject_a: stripMarkdown(parsed.subject_a),
       subject_a_angle: parsed.subject_a_angle,
-      subject_b: parsed.subject_b,
+      subject_b: stripMarkdown(parsed.subject_b),
       subject_b_angle: parsed.subject_b_angle,
-      body: parsed.body,
+      body: stripMarkdown(parsed.body),
     });
   } catch (e) {
     console.error("[generate]", e);
