@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f6f4;
-  --surface: #eef1ee;
-  --ink: #0f172a;
-  --muted: #64748b;
-  --track: #94a3b8;
-  --border: #d8e0d8;
-  --accent: #0d5c4a;
-  --accent-hover: #0a4a3b;
-  --accent-ring: rgba(13, 92, 74, 0.25);
+  --background: #f7f9f8;
+  --surface: #ffffff;
+  --surface-muted: #f2f6f4;
+  --ink: #122320;
+  --muted: #5d6f6b;
+  --track: #8b9a96;
+  --border: #d8e4de;
+  --accent: #0f5f51;
+  --accent-hover: #0c4f43;
+  --accent-ring: rgba(15, 95, 81, 0.2);
 }
 
 @theme inline {
@@ -22,4 +23,16 @@ body {
   background: var(--background);
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    1200px 600px at 90% -10%,
+    rgba(15, 95, 81, 0.09),
+    transparent 60%
+  );
 }

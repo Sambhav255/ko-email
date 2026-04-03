@@ -2,7 +2,7 @@
  * Gemini may return raw JSON or wrap it in markdown fences; extract a parseable object.
  */
 export function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
+  const trimmed = raw.replace(/^\uFEFF/, "").trim();
 
   const tryParse = (s: string) => {
     const t = s.trim();
@@ -26,15 +26,27 @@ export function extractJsonObject(raw: string): unknown {
   }
 }
 
-export function isEmailPayload(
+export type CampaignEmailPayload = {
+  subject_a: string;
+  subject_a_angle: string;
+  subject_b: string;
+  subject_b_angle: string;
+  body: string;
+};
+
+export function isCampaignEmailPayload(
   value: unknown
-): value is { subject: string; body: string } {
+): value is CampaignEmailPayload {
   if (value === null || typeof value !== "object") return false;
   const o = value as Record<string, unknown>;
   return (
-    typeof o.subject === "string" &&
+    typeof o.subject_a === "string" &&
+    typeof o.subject_a_angle === "string" &&
+    typeof o.subject_b === "string" &&
+    typeof o.subject_b_angle === "string" &&
     typeof o.body === "string" &&
-    o.subject.length > 0 &&
-    o.body.length > 0
+    o.subject_a.trim().length > 0 &&
+    o.subject_b.trim().length > 0 &&
+    o.body.trim().length > 0
   );
 }
